@@ -57,7 +57,7 @@ def main():
                 sys.exit(1)
             samples_threshold = args.samples_threshold
         else:
-            logger.debug("No command line args found. Scanning the data filder...")
+            logger.debug("No command line args found. Scanning the data folder...")
             operation, coord_file, report_file = select_input_files()
             output_file = os.path.splitext(report_file)[0] + " updated.xlsx"
             samples_threshold = 3

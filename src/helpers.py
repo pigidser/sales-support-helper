@@ -785,7 +785,7 @@ class OutletAllocation(BaseHelper):
                 
         # Remove inactive outlets
         number_before = df.shape[0]
-        df = df[df['Active']!='Неактивная']
+        df = df[df['Active']==2]
         self.logger.debug(f"Removed inactive outlets: {number_before - df.shape[0]}")
         
         # Remove outlets with empty SWE key
