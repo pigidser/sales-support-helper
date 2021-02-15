@@ -73,10 +73,13 @@ class BaseModel(object):
     def drop_nan(self):
         pass
     
-    def is_nothing_to_predict(self):
-        """ Check if the Last_Future_ship_to field consists with empty values """
+    def check_train_and_predict(self):
+        """ Check if the report has rows for training and predict """
+        if self.training.shape[0] == 0:
+            self.logger.error(f"Cannot train! No values in the target column in the report file!")
+            raise Exception
         if self.preds.shape[0] == 0:
-            self.logger.error(f"Nothing to predict! There are not empty values in the column Last_Future_ship_to in Territory Management Report does not have empty values!")
+            self.logger.error(f"Nothing to predict! No empty values in the target column in the report file!")
             raise Exception
 
     def x_transform(self, df):
@@ -279,7 +282,8 @@ class TerritoryFinderModel1(BaseModel):
         # Full dataset for prediction
         self.preds = self.x_y[self.x_y['isTrain']==False]
         self.logger.debug(f"Rows in prediction dataset: {self.preds.shape[0]}")
-        self.is_nothing_to_predict()
+
+        self.check_train_and_predict()
         
         # Training-Validation split & encoding
         self.x_train, self.x_valid, self.y_train, self.y_valid = \
@@ -395,7 +399,8 @@ class OutletAllocationModel1(BaseModel):
         # Full dataset for prediction
         self.preds = self.x_y[self.x_y['isTrain']==False]
         self.logger.debug(f"Rows in prediction dataset: {self.preds.shape[0]}")
-        self.is_nothing_to_predict()
+
+        self.check_train_and_predict()
         
         # Training-Validation split & encoding
         self.x_train, self.x_valid, self.y_train, self.y_valid = \
@@ -546,8 +551,8 @@ class BaseHelper(object):
         self.logger.info(f"Loading coordinates...")
         df = pd.read_excel(self.coord_file)
         self.logger.debug(f"Rows in {self.coord_file}: {df.shape[0]}")
-        # Remove unused fields and rename
-        df = df[['OL_ID','Latitude','Longitude']]
+        # Get first 3 columns and rename
+        df = df.iloc[:, :3]
         df.columns = ['SWE_Store_Key','Latitude','Longitude']
         # cleansing of invalid coordinates
         df = df[df['Latitude']!=0]
