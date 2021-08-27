@@ -3,8 +3,6 @@ import traceback
 import pandas as pd
 import os
 
-import os
-
 logger = logging.getLogger('sales_support_helper_application.' + __name__)
 
 def select_file(filelist):
@@ -93,31 +91,32 @@ REPORT_FILE_ALL_COLUMNS = \
     'Level_Torg_Region1','Level_Torg_Region2','Filial_Name','Filial_Ship_To','Chain_Type','Chain_Name','Chain_Id',
     'Chain_Chain_Tier_MWC','Chain_Chain_Sub_Tier_MWC','SWE_Store_Key','Store_Status','Store_Status_NOW','Outlet_Name',
     'Channel_Name_2018','Outlet_Type_2018','Trade_Structure','From_Dc','Segment_MWC_Segment_Name','Cluster_MWC',
-    'Kladr_level_1','Kladr_level_2','Kladr_level_3','Kladr_level_4','Kladr_level_5',
-    'LSV_WWY','LSV_CHOCO','LSV_MWC','Covering_Outlet_id','General_Duplicate','Ship_To_Visited','Filial_Visited',
+    'FIAS_level_0','FIAS_level_1','FIAS_level_2','FIAS_level_3','FIAS_level_4','FIAS_level_5','FIAS_level_6',
+    'LSV_WWY','LSV_CHOCO','LSV_KIND','LSV_MWC','Covering_Outlet_id','General_Duplicate','Ship_To_Visited','Filial_Visited',
     'Ship_to_Name_TO_BE','Region_loaded_RSS','MW_Ship_to_TO_BE_Name_loaded_RSS',
     'MW_Ship_to_TO_BE_loaded_RSS','CH_Ship_to_TO_BE_Name_loaded_RSS','CH_Ship_to_TO_BE_loaded_RSS',
-    'WR_Ship_to_TO_BE_Name_loaded_RSS','WR_Ship_to_TO_BE_loaded_RSS','Ship_to_Code_TO_BE',
+    'WR_Ship_to_TO_BE_Name_loaded_RSS','WR_Ship_to_TO_BE_loaded_RSS','KIND_Ship_to_TO_BE_loaded_RSS',
+	'KIND_Ship_to_TO_BE_Name','Ship_to_Code_TO_BE',
     'DC','Changed','Change_Period',
-    'Region_Last_Future_Ship_to','Last_Future_ship_to_Name','Last_Future_ship_to', 'Comment']
+    'Region_Last_Future_Ship_to','Last_Future_ship_to_Name','Last_Future_ship_to']
 
 REPORT_FILE_COLUMNS = \
     ['SWE_Store_Key','Region','Distrib','Office','FFDSL','TSE_MTDE','Level_Torg_Region1',
     'Level_Torg_Region2','Filial_Name','Filial_Ship_To','Chain_Type','Chain_Id','Chain_Chain_Tier_MWC',
     'Chain_Chain_Sub_Tier_MWC','Channel_Name_2018','Outlet_Type_2018','Trade_Structure','From_Dc',
     'Segment_MWC_Segment_Name','Cluster_MWC','Ship_To_Visited',
-    'Kladr_level_1','Kladr_level_2','Kladr_level_3','Kladr_level_4','Kladr_level_5',
+    'FIAS_level_0','FIAS_level_1','FIAS_level_2','FIAS_level_3','FIAS_level_4','FIAS_level_5','FIAS_level_6',
     'Region_Last_Future_Ship_to','Last_Future_ship_to_Name','Last_Future_ship_to']
 
 OUTLETBOOK_FILE_COLUMNS_ORIGINAL = \
 	['OL_id','Активность точки','OLDeliveryAddress','#TC',
-	'(АК) СубЪект РФ','(АК) Район\Город','(АК) Населенный пункт','(АК) Улица','(АК) Номер дома',
+	'Level0Id','Level1Id','Level2Id','Level3Id','Level4Id','Level5Id','Level6Id',
 	'FFDH (Регион)','FFDL (Area)','Ответственный сотрудник','Код сотрудника',
 	'Network_id','Network_Name','NetworkTypeName', 'Тип ТТ (MWC)']
 
 OUTLETBOOK_FILE_COLUMNS = \
 	['SWE_Store_Key','Active','Delivery_Address','Sync_Id',
-	'Kladr_level_1','Kladr_level_2','Kladr_level_3','Kladr_level_4','Kladr_level_5',
+	'FIAS_level_0','FIAS_level_1','FIAS_level_2','FIAS_level_3','FIAS_level_4','FIAS_level_5','FIAS_level_6',
 	'FFDH_Region','FFDL_Area','Responsible','Responsible_Id',
 	'Chain_Id','Chain_Name','Chain_Type','Outlet_Type']
 
@@ -136,7 +135,7 @@ XGB_PARAMS = {'colsample_bytree': 0.7,
 				'transformer_ordinal': 'OrdinalEncoder',
 				'under_predict_weight': 2.5}
 
-def create_sample_files(coord_file, report_file, frac=0.1, random_state=42):
+def create_sample_files_territoryfinder(coord_file, report_file, frac=0.1, random_state=42):
 	""" Creates sample input files for dev/test purposes """
 	# Remove dupes and non-active outlets, then save a fraction of data in 10%
 	df_terr = pd.read_excel(report_file, skiprows=1)
@@ -153,7 +152,23 @@ def create_sample_files(coord_file, report_file, frac=0.1, random_state=42):
 	with pd.ExcelWriter(sample_coord_file) as writer: # pylint: disable=abstract-class-instantiated
 		df_coor_sample.to_excel(writer, sheet_name='Sheet1', index=False)
 
-def create_sample_files_top200(coord_file, report_file, non_top200_frac = 0.1, top200_frac=1, random_state=42):
+def create_sample_files_outletallocation(coord_file, report_file, frac=0.1, random_state=42):
+	""" Creates sample input files for dev/test purposes """
+	# Remove dupes and non-active outlets, then save a fraction of data in 10%
+	df_terr = pd.read_excel(report_file, skiprows=0)
+	df_terr = df_terr[df_terr['Активность точки']==2]
+	df_terr_sample = df_terr.sample(frac=frac, random_state=random_state)
+	sample_report_file = os.path.splitext(report_file)[0] + ' sample.xlsx'
+	with pd.ExcelWriter(sample_report_file) as writer: # pylint: disable=abstract-class-instantiated
+		df_terr_sample.to_excel(writer, sheet_name='Sheet1', index=False, startrow=0)
+	# Leave only used outlets in coord file 
+	df_coor = pd.read_excel(coord_file)
+	df_coor_sample = df_coor[df_coor['OL_ID'].isin(df_terr_sample['OL_id'])]
+	sample_coord_file = os.path.splitext(coord_file)[0] + ' sample.xlsx'
+	with pd.ExcelWriter(sample_coord_file) as writer: # pylint: disable=abstract-class-instantiated
+		df_coor_sample.to_excel(writer, sheet_name='Sheet1', index=False)
+
+def create_sample_files_territoryfinder_top200(coord_file, report_file, non_top200_frac = 0.1, top200_frac=1, random_state=42):
 	""" Creates sample input files for dev/test purposes """
 	# Remove dupes and non-active outlets, then save a fraction of data
 	df_terr = pd.read_excel(report_file, skiprows=1)

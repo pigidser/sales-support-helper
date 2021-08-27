@@ -190,7 +190,6 @@ class BaseModel(object):
     def fit(self):
         """ Training on full data set """
         self.logger.info(f"Final training {self.model_description}. It will take a while")
-        # self.get_encoded()
         t0 = time()
         self.clf.fit(self.x_training_enc, self.y_training_enc)
         self.logger.debug(f"Final training finished in {time() - t0:.3f} sec.")
@@ -232,7 +231,7 @@ class TerritoryFinderModel1(BaseModel):
         # Features
         fields = ['Chain_Type', 'Chain_Id', 'Chain_Chain_Tier_MWC', 'Chain_Chain_Sub_Tier_MWC',
                     'Channel_Name_2018', 'Outlet_Type_2018', 'Trade_Structure', 'From_Dc',
-                    'Segment_MWC_Segment_Name', 'Cluster_MWC', 'Ship_To_Visited', 'Kladr_level_1',
+                    'Segment_MWC_Segment_Name', 'Cluster_MWC', 'Ship_To_Visited', 'FIAS_level_0',
                     'Latitude', 'Longitude']
         # Combine with the Target & Service fields
         fields = fields + self.service + self.target_aux + [self.target]
@@ -347,13 +346,14 @@ class OutletAllocationModel1(BaseModel):
         self.target_aux = ['FFDH_Region','FFDL_Area','Responsible']
 
         # Classifier
-        self.clf = RandomForestClassifier(class_weight='balanced', n_estimators=40,
+        self.clf = RandomForestClassifier(class_weight='balanced', n_estimators=100,
             random_state=42, n_jobs=None, warm_start=False)
 
         # Combine with the Target & Service fields
-        fields = ['Kladr_level_1', 'Kladr_level_2', 'Kladr_level_3', 'Kladr_level_4',
-                    'Chain_Name', 'Chain_Type', 'Outlet_Type', 'Latitude', 'Longitude'] + \
-                    self.service + self.target_aux + [self.target]
+        fields = ['FIAS_level_0', 'FIAS_level_1', 'FIAS_level_2', 'FIAS_level_3', 'FIAS_level_4',
+                  'FIAS_level_5', 'FIAS_level_6',
+                  'Chain_Name', 'Chain_Type', 'Outlet_Type', 'Latitude', 'Longitude'] + \
+            self.service + self.target_aux + [self.target]
 
         self.x_y = df[fields].copy()
         self.logger.debug(f"x_y shape {self.x_y.shape}")
@@ -494,9 +494,11 @@ class BaseHelper(object):
 
         Parameters:
         -----------
-        row (Series): ['Kladr_level_1','Kladr_level_2','Kladr_level_3','Kladr_level_4'] locality for getting coordinate
-        kladr_grouped (Series with Multiindex (['Kladr_level_1','Kladr_level_2','Kladr_level_3','Kladr_level_4']):
-            contains coordinate for 4-level locality
+        row (Series): ['FIAS_level_0','FIAS_level_1','FIAS_level_2','FIAS_level_3','FIAS_level_4',
+                       'FIAS_level_5','FIAS_level_6'] locality for getting coordinate
+        kladr_grouped (Series with Multiindex (['FIAS_level_0','FIAS_level_1','FIAS_level_2','FIAS_level_3',
+                                                'FIAS_level_4','FIAS_level_5','FIAS_level_6']):
+            contains coordinate for 7-level locality
 
         Returns:
         --------
@@ -504,31 +506,48 @@ class BaseHelper(object):
 
         """
         try:
-            return kladr_grouped[row['Kladr_level_1'],row['Kladr_level_2'],row['Kladr_level_3'],row['Kladr_level_4']]
+            return kladr_grouped[row['FIAS_level_0'],row['FIAS_level_1'],row['FIAS_level_2'],
+                                 row['FIAS_level_3'],row['FIAS_level_4'],row['FIAS_level_5'],
+                                 row['FIAS_level_6']]
         except KeyError:
             try:
-                return kladr_grouped[row['Kladr_level_1'],row['Kladr_level_2'],row['Kladr_level_3']].mean()
+                return kladr_grouped[row['FIAS_level_0'],row['FIAS_level_1'],row['FIAS_level_2'],
+                                     row['FIAS_level_3'],row['FIAS_level_4'],row['FIAS_level_5']].mean()
             except KeyError:
                 try:
-                    return kladr_grouped[row['Kladr_level_1'],row['Kladr_level_2']].mean()
+                    return kladr_grouped[row['FIAS_level_0'],row['FIAS_level_1'],row['FIAS_level_2'],
+                                         row['FIAS_level_3'],row['FIAS_level_4']].mean()
                 except KeyError:
                     try:
-                        return kladr_grouped[row['Kladr_level_1']].mean()
+                        return kladr_grouped[row['FIAS_level_0'],row['FIAS_level_1'],row['FIAS_level_2'],
+                                             row['FIAS_level_3']].mean()
                     except KeyError:
-                        text = f"Cannot get average coordinate for the locality {row['Kladr_level_1']}, " \
-                            f"{row['Kladr_level_2']}, {row['Kladr_level_3']}, {row['Kladr_level_4']}"
-                        self.logger.warning(text)
-                        return 0
+                        try:
+                            return kladr_grouped[row['FIAS_level_0'],row['FIAS_level_1'],
+                                                 row['FIAS_level_2']].mean()
+                        except KeyError:
+                            try:
+                                return kladr_grouped[row['FIAS_level_0'],row['FIAS_level_1']].mean()
+                            except KeyError:
+                                try:
+                                    return kladr_grouped[row['FIAS_level_0']].mean()
+                                except KeyError:
+                                    text = f"Cannot get average coordinate for the locality {row['FIAS_level_1']}, " \
+                                        f"{row['FIAS_level_2']}, {row['FIAS_level_3']}, {row['FIAS_level_4']}"
+                                    self.logger.warning(text)
+                                    return 0
     
     def restore_coordinate_part(self, part_name):
         try:
             t0 = time()
             # Series with MultiIndex
             kladr_grouped = self.df[self.df['isCoord']==1]. \
-                groupby(['Kladr_level_1','Kladr_level_2','Kladr_level_3','Kladr_level_4'])[part_name].mean()
+                groupby(['FIAS_level_0','FIAS_level_1','FIAS_level_2','FIAS_level_3',
+                         'FIAS_level_4','FIAS_level_5','FIAS_level_6'])[part_name].mean()
             self.df.loc[self.df['isCoord']==0,part_name] = \
                 self.df.loc[self.df['isCoord']==0] \
-                [['SWE_Store_Key','Kladr_level_1','Kladr_level_2','Kladr_level_3','Kladr_level_4']].apply( \
+                [['SWE_Store_Key','FIAS_level_0','FIAS_level_1','FIAS_level_2','FIAS_level_3',
+                  'FIAS_level_4','FIAS_level_5','FIAS_level_6']].apply( \
                 self.get_avg_coordinate, args=(kladr_grouped,), axis=1)
         except Exception as err:
             self.logger.exception(err)
@@ -664,7 +683,8 @@ class TerritoryFinder(BaseHelper):
         self.logger.info("Restore coordinates...")
         self.restore_coordinates()
         # remove unnecessary fields
-        self.df.drop(['Kladr_level_2','Kladr_level_3','Kladr_level_4','Kladr_level_5'],
+        self.df.drop(['FIAS_level_1','FIAS_level_2','FIAS_level_3','FIAS_level_4',
+                      'FIAS_level_5','FIAS_level_6'],
                      axis=1, inplace=True)
         # Set SWE_Store_Key as index thereby exclude it from features
         self.df.set_index('SWE_Store_Key',inplace=True)
@@ -705,9 +725,10 @@ class TerritoryFinder(BaseHelper):
         worksheet = self.workbook.active
         rows = dataframe_to_rows(df_info, index=False, header=True)
         # Row and columns for text print out
+        # (must be adjusted in the case of modification of the report)
         row_proba = 2
-        col_proba = 54    # BB column
-        col_region, col_name, col_ship_to = 49, 50, 51   # AY column
+        col_proba = 59    # BG column
+        col_region, col_name, col_ship_to = 54, 55, 56   # BB column
         # Setup proba columns width, title text, font, and alignment
         proba_widths = [19,11,5,11,5,11,5]
         proba_captions = ['SWE Store Key','1 class',' 1 proba','2 class','2 proba','3 class','3 proba']
@@ -816,8 +837,8 @@ class OutletAllocation(BaseHelper):
         self.df = pd.merge(df_terr, df_coor, on='SWE_Store_Key',how='left')
         self.logger.info("Restore coordinates...")
         self.restore_coordinates()
-        # remove unnecessary fields
-        self.df.drop(['Kladr_level_5'], axis=1, inplace=True)
+#         # remove unnecessary fields
+#         self.df.drop(['FIAS_level_5'], axis=1, inplace=True)
         # Set SWE_Store_Key as index thereby exclude it from features
         self.df.set_index('SWE_Store_Key',inplace=True)
         # Initiate models
