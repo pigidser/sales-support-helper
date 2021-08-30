@@ -1,4 +1,4 @@
-# Territory prediction for a trade outlet
+# Outlet Allocation and Territory Finder program
 
 This project uses https://github.com/cdrx/docker-pyinstaller.git repository that provides a container for ease compiling Python applications to binaries files (exe).
 
